@@ -1,0 +1,9 @@
+image:
+  registry: docker.io
+  repository: bitnami/mariadb
+  tag: 10.11.6-debian-11-r0
+
+auth:
+  existingSecret: mariadb-secret
+  database: lbarahona_wp
+  username: lbarahona_wp
