@@ -1,5 +1,29 @@
 # Infrastructure for my personal blog and projects
 
+## Cluster Optimization
+
+Safe cluster optimizations are available in `scripts/optimize-cluster.sh`. This script applies:
+
+- **Resource Quotas**: Prevent runaway resource consumption
+- **Limit Ranges**: Ensure pods have reasonable defaults
+- **Pod Security Standards**: Baseline security (blocks dangerous configurations)
+- **Cleanup**: Remove completed/failed pods
+
+### Usage
+
+```bash
+# Preview changes (dry-run)
+./scripts/optimize-cluster.sh --dry-run
+
+# Apply optimizations
+./scripts/optimize-cluster.sh
+```
+
+### What it does NOT do (intentionally)
+- No kernel parameter modifications (risky on managed K8s)
+- No privileged containers
+- No network policies (can break things if misconfigured)
+
 ## Working with Terraform
 
 This repository uses Terraform version `1.6.6`, the `digitalocean/digitalocean` provider version `>2.19.0` and the `hashicorp/kubernetes` provider version `>2.11.0`
