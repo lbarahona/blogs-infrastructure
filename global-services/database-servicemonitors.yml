@@ -1,0 +1,44 @@
+# ServiceMonitors for Database Services
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mariadb-metrics
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mariadb
+      app.kubernetes.io/component: metrics
+  namespaceSelector:
+    matchNames:
+    - mariadb
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-metrics
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: metrics
+  namespaceSelector:
+    matchNames:
+    - lbarahona-blog
+  endpoints:
+  - port: http-metrics
+    path: /metrics
+    interval: 30s

@@ -1,0 +1,102 @@
+# Falco Runtime Security Monitoring
+# Detects anomalous activity in applications and infrastructure
+
+falco:
+  # Enable gRPC API for exporting events
+  grpc:
+    enabled: true
+    bind_address: "0.0.0.0:5060"
+    threadiness: 0
+
+  # Enable modern eBPF probe (better performance)
+  driver:
+    kind: ebpf
+
+  # Syscall event buffering
+  syscall_event_drops:
+    actions:
+      - log
+      - alert
+    rate: 0.1
+    max_burst: 1000
+
+  # File output for events
+  file_output:
+    enabled: true
+    keep_alive: false
+    filename: /tmp/events.txt
+
+  # Custom rules for WordPress security
+  rules_file:
+    - /etc/falco/falco_rules.yaml
+    - /etc/falco/custom-rules.yaml
+
+# Enable metrics for monitoring integration
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+
+# Custom security rules for WordPress
+customRules:
+  custom-rules.yaml: |
+    # WordPress specific security rules
+    - rule: Unexpected WordPress File Access
+      desc: Detect access to WordPress core files that shouldn't be modified
+      condition: >
+        (fd.filename startswith "/var/www/html/wp-admin/" or
+         fd.filename startswith "/var/www/html/wp-includes/") and
+        (evt.type = openat or evt.type = open) and
+        evt.is_open_write = true and
+        not proc.name in (wp_cron, apache2, nginx, php-fpm)
+      output: >
+        Suspicious WordPress file modification
+        (file=%fd.name proc=%proc.name user=%user.name container=%container.name)
+      priority: WARNING
+
+    - rule: Database Connection from Unexpected Source
+      desc: Detect database connections from unexpected sources
+      condition: >
+        (fd.sport = 3306 or fd.dport = 3306) and
+        not proc.name in (mysqld, mariadb, php-fpm, apache2, nginx) and
+        evt.type = connect
+      output: >
+        Unexpected database connection
+        (proc=%proc.name user=%user.name container=%container.name dest_port=%fd.dport)
+      priority: ERROR
+
+    - rule: Redis Access from Unknown Process
+      desc: Detect Redis access from unexpected processes
+      condition: >
+        (fd.sport = 6379 or fd.dport = 6379) and
+        not proc.name in (redis-server, php-fpm, apache2, nginx) and
+        evt.type = connect
+      output: >
+        Unexpected Redis access
+        (proc=%proc.name user=%user.name container=%container.name)
+      priority: WARNING
+
+# Falco exporter for Prometheus integration
+falcoSidekick:
+  enabled: true
+  
+  # Enable webhook output
+  config:
+    webhook:
+      address: "http://falco-exporter:2112"
+
+# Resource configuration
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Node selector for deployment
+nodeSelector: {}
+
+# Tolerations for system nodes
+tolerations:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master

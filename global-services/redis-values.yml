@@ -4,12 +4,25 @@ auth:
   existingSecret: redis-secret
 commonConfiguration: |-
   # Enable AOF https://redis.io/topics/persistence#append-only-file
-  appendonly no
-  # Disable RDB persistence, AOF persistence already enabled.
-  save ""
+  appendonly yes
+  # RDB persistence configuration
+  save "900 1"
+  save "300 10"
+  save "60 10000"
+
+# Enable metrics for monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+
 master:
   disableCommands: []
   persistence:
-    enabled: false
+    enabled: true
+    storageClass: do-block-storage
+    size: 5Gi
+    
 replica:
   replicaCount: 1

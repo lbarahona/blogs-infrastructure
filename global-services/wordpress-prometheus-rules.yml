@@ -1,0 +1,84 @@
+# Custom Prometheus Rules for WordPress Blog Monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: wordpress-blog-rules
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: wordpress.rules
+    rules:
+    - alert: WordPressHighResponseTime
+      expr: histogram_quantile(0.95, rate(nginx_ingress_controller_request_duration_seconds_bucket{service=~".*lbarahona-blog.*"}[5m])) > 2
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "WordPress site has high response time"
+        description: "95th percentile response time is {{ $value }}s for {{ $labels.service }}"
+        
+    - alert: WordPressHighErrorRate
+      expr: rate(nginx_ingress_controller_requests_total{service=~".*lbarahona-blog.*",status=~"5.."}[5m]) / rate(nginx_ingress_controller_requests_total{service=~".*lbarahona-blog.*"}[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "WordPress site has high error rate"
+        description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.service }}"
+        
+    - alert: MariaDBDown
+      expr: up{job="mariadb"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "MariaDB database is down"
+        description: "MariaDB database has been down for more than 1 minute"
+        
+    - alert: RedisDown
+      expr: up{job="redis"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Redis cache is down"
+        description: "Redis cache has been down for more than 1 minute"
+        
+    - alert: HighMemoryUsage
+      expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage on node {{ $labels.instance }}"
+        description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+        
+    - alert: HighDiskUsage
+      expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High disk usage on {{ $labels.instance }}"
+        description: "Disk usage is {{ $value }}% on {{ $labels.instance }} for filesystem {{ $labels.mountpoint }}"
+        
+    - alert: KubernetesNodeNotReady
+      expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Kubernetes node is not ready"
+        description: "Node {{ $labels.node }} has been not ready for more than 10 minutes"
+        
+    - alert: PodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod {{ $labels.pod }} is crash looping"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting frequently"

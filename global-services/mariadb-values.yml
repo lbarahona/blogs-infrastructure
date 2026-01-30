@@ -7,3 +7,17 @@ auth:
   existingSecret: mariadb-secret
   database: lbarahona_wp
   username: lbarahona_wp
+
+# Enable metrics for monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+  
+# Persistence configuration
+primary:
+  persistence:
+    enabled: true
+    storageClass: do-block-storage
+    size: 20Gi

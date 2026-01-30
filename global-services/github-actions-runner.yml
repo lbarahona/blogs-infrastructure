@@ -1,0 +1,104 @@
+# Self-hosted GitHub Actions Runner for CI/CD
+# Provides secure, scalable CI/CD within the Kubernetes cluster
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-actions-runner
+  namespace: ci-cd
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: github-actions-runner
+  template:
+    metadata:
+      labels:
+        app: github-actions-runner
+    spec:
+      serviceAccountName: github-actions-runner
+      containers:
+      - name: runner
+        image: sumologic/kubernetes-tools:2.9.0
+        env:
+        - name: RUNNER_REPOSITORY_URL
+          value: "https://github.com/lbarahona"
+        - name: RUNNER_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-runner-secret
+              key: token
+        - name: RUNNER_WORK_DIRECTORY
+          value: "/tmp/runner/work"
+        - name: RUNNER_NAME
+          value: "k8s-runner"
+        - name: RUNNER_LABELS
+          value: "kubernetes,self-hosted,docker"
+        volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        - name: work-dir
+          mountPath: /tmp/runner/work
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+      volumes:
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: work-dir
+        emptyDir: {}
+      nodeSelector:
+        kubernetes.io/os: linux
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: github-actions-runner
+  namespace: ci-cd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: github-actions-runner
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "create", "update", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "create", "update", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "create", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: github-actions-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: github-actions-runner
+subjects:
+- kind: ServiceAccount
+  name: github-actions-runner
+  namespace: ci-cd
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-runner-secret
+  namespace: ci-cd
+type: Opaque
+stringData:
+  token: "YOUR_GITHUB_RUNNER_TOKEN_HERE"

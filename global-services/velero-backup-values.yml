@@ -1,0 +1,76 @@
+# Velero Backup Solution for Kubernetes
+# Provides automated backups of Kubernetes resources and persistent volumes
+
+configuration:
+  # DigitalOcean Spaces configuration
+  provider: aws
+  backupStorageLocation:
+    name: default
+    provider: aws
+    bucket: lbarahona-k8s-backups
+    config:
+      region: nyc3
+      s3ForcePathStyle: "true"
+      s3Url: https://nyc3.digitaloceanspaces.com
+  volumeSnapshotLocation:
+    name: default
+    provider: digitalocean.com/velero
+    config:
+      region: nyc3
+
+# Credentials for DigitalOcean Spaces
+credentials:
+  useSecret: true
+  name: velero-credentials
+
+# Backup schedules
+schedules:
+  # Daily backup of all resources
+  daily-backup:
+    schedule: "0 2 * * *"  # 2 AM daily
+    template:
+      ttl: "720h"  # 30 days retention
+      includedNamespaces:
+        - lbarahona-blog
+        - mariadb
+        - monitoring
+      excludedResources:
+        - events
+        - events.events.k8s.io
+        - backups.velero.io
+        - restores.velero.io
+        - resticrepositories.velero.io
+  
+  # Weekly full cluster backup
+  weekly-backup:
+    schedule: "0 1 * * 0"  # 1 AM every Sunday
+    template:
+      ttl: "2160h"  # 90 days retention
+      includedNamespaces: ["*"]
+      excludedResources:
+        - events
+        - events.events.k8s.io
+        - backups.velero.io
+        - restores.velero.io
+
+# Enable metrics for monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    
+# Resource limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+# Security context
+securityContext:
+  fsGroup: 65534
+
+# Node exporter for backup metrics
+deployRestic: true
