@@ -1,0 +1,223 @@
+# HTTPRoutes for Envoy Gateway Migration
+# Phase 2: Route all services through the new gateway
+# Created: 2026-03-06 (Nightly Session #18)
+#
+# Order (least critical → most critical):
+# 1. secondbrain
+# 2. mission-control
+# 3. kubementor-dashboard
+# 4. kubementor-api
+# 5. kubementor-landing (kubementor.io)
+# 6. argocd
+# 7. blog (lesterbarahona.com)
+# 8. blog www redirect
+
+---
+# 1. Second Brain - Simple proxy
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: secondbrain
+  namespace: secondbrain
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+  hostnames:
+  - "2ndbrain.lesterbarahona.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: secondbrain
+      port: 3000
+
+---
+# 2. Mission Control - Path-based routing (API + frontend)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mission-control
+  namespace: mission-control
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+  hostnames:
+  - "mission.lesterbarahona.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api/
+    backendRefs:
+    - name: backend
+      port: 8080
+  - matches:
+    - path:
+        type: Exact
+        value: /health
+    backendRefs:
+    - name: backend
+      port: 8080
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: frontend
+      port: 3000
+
+---
+# 3. KubeMentor Dashboard
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kubementor-dashboard
+  namespace: kubementor
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+  hostnames:
+  - "dashboard-kubementor.lesterbarahona.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: kubementor-dashboard
+      port: 80
+
+---
+# 4. KubeMentor API
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kubementor-api
+  namespace: kubementor
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+  hostnames:
+  - "kubementor-api.lesterbarahona.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: kubementor-api
+      port: 80
+
+---
+# 5. KubeMentor Landing (kubementor.io - separate domain)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kubementor-landing
+  namespace: kubementor
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+  hostnames:
+  - "kubementor.io"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: kubementor-landing
+      port: 80
+
+---
+# 6. ArgoCD
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+  hostnames:
+  - "argocd.lesterbarahona.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: argocd-server
+      port: 80
+
+---
+# 7. Blog (lesterbarahona.com) - Main site
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: blog
+  namespace: lbarahona-blog
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+  hostnames:
+  - "lesterbarahona.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: lbarahona-blog-wordpress
+      port: 80
+
+---
+# 8. Blog www redirect → apex
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: blog-www-redirect
+  namespace: lbarahona-blog
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+  hostnames:
+  - "www.lesterbarahona.com"
+  rules:
+  - filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        hostname: lesterbarahona.com
+        statusCode: 301
+    backendRefs: []
+
+---
+# 9. HTTP → HTTPS redirect (all hosts)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-to-https-redirect
+  namespace: envoy-gateway-system
+spec:
+  parentRefs:
+  - name: main-gateway
+    namespace: envoy-gateway-system
+    sectionName: http
+  rules:
+  - filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        statusCode: 301
+    backendRefs: []
